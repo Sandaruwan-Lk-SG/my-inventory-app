@@ -1,84 +1,76 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios'; // Axios භාවිතා කිරීමට
-
-// API Base URL එක .env ගොනුවකින් ගන්න (නැතිනම් මෙහි දමන්න)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
+import api from '../api/api'; 
 
 const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
 
-// Context Provider Component එක
 export const AuthProvider = ({ children }) => {
-    // Local Storage වෙතින් මූලික Token එක සහ User Role එක ලබාගැනීම
-    const [token, setToken] = useState(localStorage.getItem('jwtToken'));
-    const [userRole, setUserRole] = useState(localStorage.getItem('userRole'));
-    const [isLoading, setIsLoading] = useState(false);
+    // Initial state: Local Storage වෙතින් ආරක්ෂිතව ලබාගැනීම
+    const [token, setToken] = useState(null);
+    const [userRole, setUserRole] = useState(null);
+    const [isLoading, setIsLoading] = useState(true); // මුලින්ම true ලෙස තබමු
     const [error, setError] = useState(null);
 
-    // 🔑 1. Login Logic
+    useEffect(() => {
+        // App Load වන විට Local Storage හි තොරතුරු පූරණය කිරීම
+        const storedToken = localStorage.getItem('jwtToken');
+        const storedRole = localStorage.getItem('userRole');
+        
+        if (storedToken && storedRole) {
+            setToken(storedToken);
+            setUserRole(storedRole);
+        }
+        setIsLoading(false); 
+    }, []);
+
+    // 🔑 Login Logic: /api/login POST
     const login = async (username, password) => {
         setIsLoading(true);
         setError(null);
         try {
-            // Mock Credentials මත පදනම්ව Role එක තීරණය කිරීම (External Auth Simulation)
-            let role = 'User';
-            if (username === 'master') {
-                role = 'MasterAdmin';
-            } else if (username === 'admin') {
-                role = 'InventoryAdmin';
-            } else if (username === 'user') {
-                role = 'User';
-            } else {
-                throw new Error('Invalid Credentials (Mock failed)');
-            }
-            
-            // සත්‍ය Backend Call එක
-            const response = await axios.post(`${API_BASE_URL}/login`, {
+            const response = await api.post('/login', {
                 username,
                 password,
             });
 
-            const newToken = response.data.token; 
-            
-            // සත්‍ය Backend එකෙන් ලැබෙන role එක භාවිතා කළ හැකිය.
-            // දැනට Mock Role එක භාවිතා කරමු.
-            
-            setToken(newToken);
-            setUserRole(role); // Token එක සමඟ backend එකෙන් role එකක් ලබා ගැනීම වඩාත් සුදුසුය.
+            const newToken = response.data.token;
+            // ⚠️ Backend එකෙන් role එකක් ලැබෙන්නේ නම් එය භාවිතා කරන්න.
+            // නැතිනම්, මෙහිදී Mock logic එක භාවිතා කරන්න (පරීක්ෂා කිරීම සඳහා):
+            let role = response.data.role || 'User'; 
+            if (username === 'master') { role = 'MasterAdmin'; } 
+            else if (username === 'admin') { role = 'InventoryAdmin'; } 
+            else if (username === 'user') { role = 'User'; } 
 
-            // Local Storage හි ගබඩා කිරීම
+            setToken(newToken);
+            setUserRole(role); 
+
             localStorage.setItem('jwtToken', newToken);
             localStorage.setItem('userRole', role);
-
+            
             return true;
         } catch (err) {
-            console.error('Login Error:', err);
-            setError(err.response?.data?.message || 'Login failed. Check credentials.');
+            setError(err.response?.data?.message || 'Login failed. Check server connection or credentials.');
             return false;
         } finally {
             setIsLoading(false);
         }
     };
 
-    // Logout Logic
+    // 🚪 Logout Logic
     const logout = () => {
         setToken(null);
         setUserRole(null);
         localStorage.removeItem('jwtToken');
         localStorage.removeItem('userRole');
-        // අනෙකුත් cleanup මෙහිදී කළ හැකිය (Ex: Cart state clear කිරීම)
     };
     
-    // RBAC සඳහා පහසු ක්‍රියාකාරිත්වයක්
+    // 🛡️ Role Check (RBAC)
     const hasRole = (requiredRoles) => {
         if (!userRole) return false;
-        // requiredRoles යනු ['MasterAdmin', 'InventoryAdmin'] වැනි Array එකකි.
         return requiredRoles.includes(userRole);
     };
 
-
-    // Context Value එක
     const value = {
         token,
         userRole,
@@ -87,7 +79,7 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         hasRole,
-        isAuthenticated: !!token, // boolean value
+        isAuthenticated: !!token, 
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
