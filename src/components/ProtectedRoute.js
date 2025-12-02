@@ -1,45 +1,39 @@
 import React from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { useRouter } from 'next/router'; // හෝ React Router හි Navigate
+// React Router භාවිතා කරන්නේ නම්:
+import { Navigate } from 'react-router-dom'; 
+// Next.js භාවිතා කරන්නේ නම්: 
+// import { useRouter } from 'next/router';
 
-// MasterAdmin හෝ InventoryAdmin වැනි Array එකක් ලෙස requiredRoles ලබා දෙන්න
-const ProtectedRoute = ({ children, requiredRoles }) => {
+const ProtectedRoute = ({ children, requiredRoles = [] }) => {
     const { isAuthenticated, userRole, isLoading, logout } = useAuth();
-    const router = useRouter();
+    // const router = useRouter(); // Next.js සඳහා
 
     if (isLoading) {
-        // Auth state load වන තුරු Loading පෙන්වන්න
-        return <div>Loading Authentication...</div>;
+        return <div>Loading authentication state...</div>;
     }
     
     // 1. Authentication පරීක්ෂාව
     if (!isAuthenticated) {
-        // Login පිටුවට යොමු කරන්න
-        router.push('/Login');
-        return null;
+        // React Router: Login පිටුවට යොමු කරන්න
+        return <Navigate to="/login" replace />;
+        // Next.js: router.push('/login'); return null;
     }
 
     // 2. Role-Based Access Control (RBAC) පරීක්ෂාව
-    if (requiredRoles && requiredRoles.length > 0) {
-        if (!requiredRoles.includes(userRole)) {
-            // අවසර නැති බවට පණිවිඩයක් පෙන්වන්න
-            return (
-                <div style={{ padding: '50px', textAlign: 'center' }}>
-                    <h1>🛑 Access Denied</h1>
-                    <p>Your role ({userRole}) does not have permission to view this page.</p>
-                    <button onClick={logout}>Logout</button>
-                </div>
-            );
-        }
+    if (requiredRoles.length > 0 && !requiredRoles.includes(userRole)) {
+        return (
+            <div style={{ padding: '50px', textAlign: 'center', backgroundColor: '#fee', border: '1px solid #f00', margin: '20px' }}>
+                <h1>🛑 Access Denied</h1>
+                <p>ඔබගේ {userRole} Role එකට මෙම පිටුවට ප්‍රවේශ විය නොහැක.</p>
+                <p>අවශ්‍ය Roles: **{requiredRoles.join(', ')}**</p>
+                <button onClick={logout} style={{ padding: '10px', marginTop: '20px', backgroundColor: '#dc3545', color: 'white', border: 'none', cursor: 'pointer' }}>Logout</button>
+            </div>
+        );
     }
 
-    // සියලු පරීක්ෂා සමත් නම්, දරුවා (children) පෙන්වන්න
+    // සියල්ල හරි නම්, දරුවා (children) පෙන්වන්න
     return children;
 };
 
 export default ProtectedRoute;
-
-// භාවිත උදාහරණය:
-// <ProtectedRoute requiredRoles={['MasterAdmin', 'InventoryAdmin']}>
-//    <StockTransactionPage />
-// </ProtectedRoute>
